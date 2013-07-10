@@ -111,12 +111,12 @@ class block_course_menu extends block_base
         $week = optional_param($courseFormat, -1, PARAM_INT);
 
         if ($week != -1) {
-            $displaysection = course_set_display($this->course->id, $week);
+            $displaysection = $week;//course_set_display($this->course->id, $week);
         } else {
             if (isset($USER->display[$this->course->id])) {
                 $displaysection = $USER->display[$this->course->id];
             } else {
-                $displaysection = course_set_display($this->course->id, 0);
+                $displaysection = 0;//course_set_display($this->course->id, 0);
             }
         }
 
@@ -171,7 +171,8 @@ class block_course_menu extends block_base
             }
         }
 
-        $this->page->requires->yui2_lib('dom');
+        //$this->page->requires->yui_module('dom');
+		//$this->page->requires->yui2_module('dom');
 
         $module = array('name' => 'block_course_menu', 'fullpath' => '/blocks/course_menu/course_menu.js', 'requires' => array('core_dock', 'io', 'node', 'dom', 'event-custom', 'json-parse'), 'strings' => array(array('viewallcourses', 'moodle')));
         $limit = 20;
@@ -339,7 +340,9 @@ class block_course_menu extends block_base
         $output .= '</div>';
 
         $this->contentgenerated = true;
+		$this->content = new stdClass();
         $this->content->text = $output;
+		$this->content->footer = "footer";
 
         return $this->content;
     }
@@ -617,8 +620,10 @@ class block_course_menu extends block_base
         if (!empty($this->instance) && $this->page->course->id != SITEID) {
 
             require_once($CFG->dirroot . "/course/lib.php");
-            get_all_mods($this->course->id, $mods, $modnames, $modnamesplural, $modnamesused);
-
+            //get_all_mods($this->course->id, $mods, $modnames, $modnamesplural, $modnamesused);
+			$fastmodinfo = get_fast_modinfo($this->course);
+			$mods = $fastmodinfo->get_instances();
+			
             $context = get_context_instance(CONTEXT_COURSE, $this->course->id);
             $isteacher = has_capability('moodle/course:update', $context);
 
@@ -627,24 +632,27 @@ class block_course_menu extends block_base
             // displaysection - current section
             $week = optional_param($courseFormat, -1, PARAM_INT);
             if ($week != -1) {
-                $displaysection = course_set_display($this->course->id, $week);
+                $displaysection = $week;//course_set_display($this->course->id, $week);
             } else {
                 if (isset($USER->display[$this->course->id])) {
                     $displaysection = $USER->display[$this->course->id];
                 } else {
-                    $displaysection = course_set_display($this->course->id, 0);
+                    $displaysection = 0;//course_set_display($this->course->id, 0);
                 }
             }
 
             $genericName = get_string("name" . $this->course->format, $this->blockname);
-            $allSections = get_all_sections($this->course->id);
+            //$allSections = get_all_sections($this->course->id);
+			$allSections = $fastmodinfo->get_sections();
 
             $sections = array();
             if ($this->course->format != 'social' && $this->course->format != 'scorm') {
-                foreach ($allSections as $k => $section) {
+			//die(print_r($allSections));
+                foreach ($allSections as $k => $sectionmods) {
 
-                    if ($k <= $this->course->numsections) { // get_all_sections() may return sections that are in the db but not displayed because the number of the sections for this course was lowered - bug [CM-B10]
-                        if (!empty($section)) {
+                    if ($k <= count($allSections)) { //$this->course->numsections) { // get_all_sections() may return sections that are in the db but not displayed because the number of the sections for this course was lowered - bug [CM-B10]
+                        if (!empty($sectionmods)) {
+							$section = $fastmodinfo->get_section_info($k);
                             $newSec = array();
                             $newSec['visible'] = $section->visible;
 
@@ -674,7 +682,7 @@ class block_course_menu extends block_base
                             $modinfo = unserialize($this->course->modinfo);
 
                             $newSec['resources'] = array();
-                            $sectionmods = explode(",", $section->sequence);
+                            //$sectionmods = explode(",", $section->sequence);
                             foreach ($sectionmods as $modnumber) {
                                 if (empty($mods[$modnumber])) {
                                     continue;
@@ -795,18 +803,18 @@ class block_course_menu extends block_base
         if (!empty($this->config->trimlength)) {
             $length = (int) $this->config->trimlength;
         }
-        $textlib = textlib_get_instance();
-        $str_length = $textlib->strlen($str);
+        //$textlib = textlib_get_instance();
+        $str_length = textlib::strlen($str);
         if ($str_length <= ($length + 3)) {
             return $str;
         }
         switch ($mode) {
             case self::TRIM_RIGHT :
-                return $this->trim_right($textlib, $str, $length);
+                return $this->trim_right($str, $length);
             case self::TRIM_LEFT :
-                return $this->trim_left($textlib, $str, $length);
+                return $this->trim_left($str, $length);
             case self::TRIM_CENTER :
-                return $this->trim_center($textlib, $str, $length);
+                return $this->trim_center($str, $length);
         }
         return $str;
     }
@@ -818,9 +826,9 @@ class block_course_menu extends block_base
      * @param int $length The length to truncate to
      * @return string The truncated string
      */
-    protected function trim_left($textlib, $string, $length)
+    protected function trim_left($string, $length)
     {
-        return '...' . $textlib->substr($string, $textlib->strlen($string) - $length);
+        return '...' . textlib::substr($string, textlib::strlen($string) - $length);
     }
 
     /**
@@ -830,9 +838,9 @@ class block_course_menu extends block_base
      * @param int $length The length to truncate to
      * @return string The truncated string
      */
-    protected function trim_right($textlib, $string, $length)
+    protected function trim_right($string, $length)
     {
-        return $textlib->substr($string, 0, $length) . '...';
+        return textlib::substr($string, 0, $length) . '...';
     }
 
     /**
@@ -842,11 +850,11 @@ class block_course_menu extends block_base
      * @param int $length The length to truncate to
      * @return string The truncated string
      */
-    protected function trim_center($textlib, $string, $length)
+    protected function trim_center($string, $length)
     {
         $trimlength = ceil($length / 2);
-        $start = $textlib->substr($string, 0, $trimlength);
-        $end = $textlib->substr($string, $textlib->strlen($string) - $trimlength);
+        $start = textlib::substr($string, 0, $trimlength);
+        $end = textlib::substr($string, textlib::strlen($string) - $trimlength);
         $string = $start . '...' . $end;
         return $string;
     }
